@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Assosa Ledger — Site Operations</title>
+<style>
+  :root {
+    --bg: #1F160A;
+    --panel: #2A1F0F;
+    --panel-2: #352712;
+    --border: #4A3A1C;
+    --text: #F5E9CE;
+    --text-muted: #B49B6C;
+    --accent: #D9A404;
+    --accent-strong: #F2C94C;
+    --accent-text: #2B1B06;
+    --danger: #C05A40;
+    --danger-bg: #3A241C;
+    --success: #8FA467;
+    --success-bg: #262C1E;
+    --warning: #D2A23D;
+    --warning-bg: #362C1B;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  :root:not([data-theme="light"]) { color-scheme: dark; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #FBF6EA;
+      --panel: #FFFFFF;
+      --panel-2: #F3E9CF;
+      --border: #E3D3A8;
+      --text: #2B1B06;
+      --text-muted: #7A6438;
+      --accent-text: #2B1B06;
+      --danger-bg: #F6E1DA;
+      --success-bg: #E7EDDB;
+      --warning-bg: #F5E9CE;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #FBF6EA;
+    --panel: #FFFFFF;
+    --panel-2: #F3E9CF;
+    --border: #E3D3A8;
+    --text: #2B1B06;
+    --text-muted: #7A6438;
+    --accent-text: #2B1B06;
+    --danger-bg: #F6E1DA;
+    --success-bg: #E7EDDB;
+    --warning-bg: #F5E9CE;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    min-height: 100%;
+  }
+  a { color: inherit; }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ---- Sidebar (desktop) ---- */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .brand {
+    padding: 0 20px 18px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .brand .name { font-size: 17px; font-weight: 700; letter-spacing: 0.2px; }
+  .brand .sub { color: var(--text-muted); font-size: 12.5px; margin-top: 2px; }
+  nav.tabs { display: flex; flex-direction: column; gap: 2px; padding: 0 10px; flex: 1; overflow-y: auto; }
+  .tab-btn {
+    text-align: left;
+    background: none;
+    border: none;
+    border-left: 3px solid transparent;
+    color: var(--text-muted);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .tab-btn:hover { background: var(--panel-2); color: var(--text); }
+  .tab-btn.active { background: var(--panel-2); color: var(--text); border-left-color: var(--accent); font-weight: 600; }
+  .sidebar-foot { padding: 10px 20px 0 20px; border-top: 1px solid var(--border); margin-top: 10px; }
+  .theme-toggle {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    font-size: 12px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-family: inherit;
+    width: 100%; margin-top: 10px;
+  }
+
+  /* ---- Main ---- */
+  main { flex: 1; min-width: 0; padding: 28px 32px 90px 32px; max-width: 980px; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .section-desc { color: var(--text-muted); font-size: 13.5px; margin: 0 0 22px 0; max-width: 62ch; }
+
+  /* Dashboard cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 26px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .card .label { color: var(--text-muted); font-size: 12px; }
+  .card .value { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .card.flag { border-color: var(--warning); background: var(--warning-bg); }
+  .card.flag .value { color: var(--warning); }
+
+  .alert-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 26px; }
+  .alert {
+    border: 1px solid var(--warning); background: var(--warning-bg);
+    border-radius: 8px; padding: 10px 14px; font-size: 13.5px;
+  }
+  .alert.danger { border-color: var(--danger); background: var(--danger-bg); }
+
+  /* Forms */
+  form.entry-form {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; margin-bottom: 22px; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;
+  }
+  form.entry-form .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  input, select, textarea {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 10px; border-radius: 6px; font-size: 14px; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .form-actions { grid-column: 1 / -1; display: flex; gap: 10px; }
+  button.primary {
+    background: var(--accent); color: var(--accent-text); border: none; font-weight: 600;
+    padding: 9px 18px; border-radius: 7px; cursor: pointer; font-size: 14px; font-family: inherit;
+  }
+  button.primary:hover { background: var(--accent-strong); }
+  button.ghost {
+    background: none; border: 1px solid var(--border); color: var(--text);
+    padding: 9px 14px; border-radius: 7px; cursor: pointer; font-size: 13.5px; font-family: inherit;
+  }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: none; }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .status-pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; }
+  .pill-ok { background: var(--success-bg); color: var(--success); }
+  .pill-warn { background: var(--warning-bg); color: var(--warning); }
+  .pill-bad { background: var(--danger-bg); color: var(--danger); }
+  .row-del { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; }
+  .row-del:hover { color: var(--danger); }
+  .empty-row td { color: var(--text-muted); text-align: center; padding: 26px; }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; flex-wrap: wrap; }
+  .toolbar .right { display: flex; gap: 8px; }
+
+  /* Mobile bottom nav */
+  .bottom-nav { display: none; }
+  @media (max-width: 800px) {
+    .sidebar { display: none; }
+    main { padding: 20px 16px 90px 16px; max-width: 100%; }
+    .bottom-nav {
+      display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--panel); border-top: 1px solid var(--border);
+      overflow-x: auto; padding: 6px env(safe-area-inset-bottom, 0px) calc(6px + env(safe-area-inset-bottom, 0px)) 8px;
+      gap: 4px; z-index: 20;
+    }
+    .bottom-nav button {
+      background: none; border: none; color: var(--text-muted); font-size: 11px;
+      padding: 8px 12px; border-radius: 8px; flex-shrink: 0; font-family: inherit; cursor: pointer;
+    }
+    .bottom-nav button.active { color: var(--accent); background: var(--panel-2); font-weight: 600; }
+    .topbar-mobile {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+    }
+    .topbar-mobile .name { font-weight: 700; font-size: 16px; }
+  }
+  .topbar-mobile { display: none; }
+  @media (max-width: 800px) { .topbar-mobile { display: flex; } }
+</style>
+</head>
+<body>
+
+<div id="loginScreen" style="display:none; min-height:100vh; align-items:center; justify-content:center; padding:20px;">
+  <form id="loginForm" style="background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:26px; width:100%; max-width:360px;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:2px;">
+      <svg width="24" height="30" viewBox="0 0 32 40" aria-hidden="true" style="flex-shrink:0;">
+        <polygon points="16,2 2,14 16,14" fill="#F2C94C"/>
+        <polygon points="16,2 16,14 30,14" fill="#C9970A"/>
+        <polygon points="2,14 16,14 16,38" fill="#D9A404"/>
+        <polygon points="16,14 30,14 16,38" fill="#8B6508"/>
+        <polygon points="16,2 30,14 16,38 2,14" fill="none" stroke="#5C4106" stroke-width="0.75"/>
+      </svg>
+      <div style="font-weight:700; font-size:18px;">Assosa Ledger</div>
+    </div>
+    <div style="color:var(--text-muted); font-size:13px; margin-bottom:18px;">Sign in to your shared site log.</div>
+    <div id="loginError" style="display:none; background:var(--danger-bg); color:var(--danger); border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:12px;"></div>
+    <div style="margin-bottom:12px;">
+      <label for="serverUrl">Server URL</label>
+      <input id="serverUrl" type="text" placeholder="https://your-service.onrender.com">
+    </div>
+    <div style="margin-bottom:12px;">
+      <label for="loginUser">Username</label>
+      <input id="loginUser" type="text" autocomplete="username">
+    </div>
+    <div style="margin-bottom:16px;">
+      <label for="loginPass">Password</label>
+      <input id="loginPass" type="password" autocomplete="current-password">
+    </div>
+    <button class="primary" type="submit" style="width:100%;">Sign in</button>
+  </form>
+</div>
+
+<div class="app" id="appShell" style="display:none;">
+  <aside class="sidebar">
+    <div class="brand">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <svg width="20" height="25" viewBox="0 0 32 40" aria-hidden="true" style="flex-shrink:0;">
+          <polygon points="16,2 2,14 16,14" fill="#F2C94C"/>
+          <polygon points="16,2 16,14 30,14" fill="#C9970A"/>
+          <polygon points="2,14 16,14 16,38" fill="#D9A404"/>
+          <polygon points="16,14 30,14 16,38" fill="#8B6508"/>
+          <polygon points="16,2 30,14 16,38 2,14" fill="none" stroke="#5C4106" stroke-width="0.75"/>
+        </svg>
+        <div class="name">Assosa Ledger</div>
+      </div>
+      <div class="sub" id="whoAmI">Site operations &amp; commission tracking</div>
+    </div>
+    <nav class="tabs" id="sidebarTabs"></nav>
+    <div class="sidebar-foot">
+      <button class="theme-toggle" id="themeToggle">Switch to light view</button>
+      <button class="theme-toggle" id="logoutBtn">Sign out</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar-mobile">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <svg width="18" height="22" viewBox="0 0 32 40" aria-hidden="true" style="flex-shrink:0;">
+          <polygon points="16,2 2,14 16,14" fill="#F2C94C"/>
+          <polygon points="16,2 16,14 30,14" fill="#C9970A"/>
+          <polygon points="2,14 16,14 16,38" fill="#D9A404"/>
+          <polygon points="16,14 30,14 16,38" fill="#8B6508"/>
+          <polygon points="16,2 30,14 16,38 2,14" fill="none" stroke="#5C4106" stroke-width="0.75"/>
+        </svg>
+        <div class="name">Assosa Ledger</div>
+      </div>
+      <button class="theme-toggle" id="themeToggleMobile" style="width:auto;">Theme</button>
+    </div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<nav class="bottom-nav" id="bottomNav"></nav>
+
+<input type="file" id="importFile" accept="application/json" style="display:none;">
+
+<script>
+(function () {
+  "use strict";
+
+  const THEME_KEY = "assosa_ledger_theme";
+  const API_URL_KEY = "assosa_api_url";
+  const TOKEN_KEY = "assosa_token";
+  const SESSION_KEY = "assosa_session"; // {username, name, role}
+
+  let apiUrl = localStorage.getItem(API_URL_KEY) || "";
+  let token = localStorage.getItem(TOKEN_KEY) || "";
+  let session = null;
+  try { session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch (e) { session = null; }
+
+  async function api(path, opts) {
+    opts = opts || {};
+    const headers = Object.assign({}, opts.headers || {});
+    if (token) headers["Authorization"] = "Bearer " + token;
+    const resp = await fetch(apiUrl.replace(/\/$/, "") + path, Object.assign({}, opts, { headers }));
+    if (resp.status === 401) {
+      signOut();
+      throw new Error("Session expired — please sign in again.");
+    }
+    if (!resp.ok) {
+      let detail = resp.statusText;
+      try { const j = await resp.json(); detail = j.detail || detail; } catch (e) { /* ignore */ }
+      throw new Error(detail);
+    }
+    if (resp.status === 204) return null;
+    return resp.json();
+  }
+
+  function signOut() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(SESSION_KEY);
+    token = "";
+    session = null;
+    document.getElementById("appShell").style.display = "none";
+    document.getElementById("loginScreen").style.display = "flex";
+  }
+
+  // ---------- Module schema ----------
+  const MODULES = [
+    { key: "dashboard", label: "Overview" },
+    {
+      key: "equipment", label: "Equipment", title: "Equipment & fleet",
+      desc: "Excavators, trucks, and site vehicles — status and last service.",
+      fields: [
+        { key: "name", label: "Name / asset", type: "text", required: true },
+        { key: "type", label: "Type", type: "select", options: ["Excavator", "Sinotruk", "Site car", "Other"] },
+        { key: "identifier", label: "Plate / asset no.", type: "text" },
+        { key: "status", label: "Status", type: "select", options: ["Active", "Maintenance", "Idle"] },
+        { key: "hours", label: "Hours / KM", type: "number" },
+        { key: "lastService", label: "Last service", type: "date" },
+        { key: "notes", label: "Notes", type: "text", full: true }
+      ],
+      columns: ["name", "type", "identifier", "status", "hours", "lastService"]
+    },
+    {
+      key: "crews", label: "Crews", title: "Commission crews",
+      desc: "Crews working the site on commission, and how their rate is defined.",
+      fields: [
+        { key: "name", label: "Crew name / lead", type: "text", required: true },
+        { key: "members", label: "Members", type: "number" },
+        { key: "commissionBasis", label: "Commission basis", type: "select", options: ["% of gross revenue", "% of net revenue", "Per gram delivered", "Fixed per job"] },
+        { key: "rate", label: "Rate", type: "text" },
+        { key: "startDate", label: "Start date", type: "date" },
+        { key: "notes", label: "Notes", type: "text", full: true }
+      ],
+      columns: ["name", "members", "commissionBasis", "rate", "startDate"]
+    },
+    {
+      key: "extraction", label: "Extraction", title: "Extraction log",
+      desc: "What each crew has produced, and whether the geologists have verified it — this is what commission should be paid against, not the crew's own count.",
+      fields: [
+        { key: "date", label: "Date", type: "date", required: true },
+        { key: "crewName", label: "Crew", type: "text" },
+        { key: "weightGrams", label: "Weight (g)", type: "number" },
+        { key: "verified", label: "Geologist verified", type: "select", options: ["Pending", "Verified", "Disputed"] },
+        { key: "gradeNote", label: "Grade / zone note", type: "text" },
+        { key: "notes", label: "Notes", type: "text", full: true }
+      ],
+      columns: ["date", "crewName", "weightGrams", "verified", "gradeNote"]
+    },
+    {
+      key: "custody", label: "Gold custody", title: "Gold custody & deposits",
+      desc: "Chain from verified extraction to National Bank (or licensed bank) deposit.",
+      fields: [
+        { key: "date", label: "Date", type: "date", required: true },
+        { key: "weightGrams", label: "Weight (g)", type: "number" },
+        { key: "destination", label: "Destination", type: "select", options: ["National Bank of Ethiopia", "Licensed bank", "On-site storage"] },
+        { key: "receiptRef", label: "Receipt / reference no.", type: "text" },
+        { key: "notes", label: "Notes", type: "text", full: true }
+      ],
+      columns: ["date", "weightGrams", "destination", "receiptRef"]
+    },
+    {
+      key: "compliance", label: "Compliance", title: "Licenses & permits",
+      desc: "Mining license, water permit, environmental permit — with expiry tracking.",
+      fields: [
+        { key: "name", label: "License / permit", type: "text", required: true },
+        { key: "issuedDate", label: "Issued", type: "date" },
+        { key: "expiryDate", label: "Expires", type: "date" },
+        { key: "status", label: "Status", type: "select", options: ["Valid", "Expiring soon", "Expired", "Pending"] },
+        { key: "notes", label: "Notes", type: "text", full: true }
+      ],
+      columns: ["name", "issuedDate", "expiryDate", "status"]
+    },
+    {
+      key: "security", label: "Security", title: "Security log",
+      desc: "Patrol check-ins and any incidents, for the federal police detail and site access.",
+      fields: [
+        { key: "date", label: "Date", type: "date", required: true },
+        { key: "type", label: "Type", type: "select", options: ["Patrol check-in", "Incident", "Briefing"] },
+        { key: "personnel", label: "Personnel involved", type: "number" },
+        { key: "details", label: "Details", type: "text", full: true }
+      ],
+      columns: ["date", "type", "personnel", "details"]
+    },
+    {
+      key: "budget", label: "Budget", title: "Budget & expenses",
+      desc: "Spend against the project plan, by category.",
+      fields: [
+        { key: "date", label: "Date", type: "date", required: true },
+        { key: "category", label: "Category", type: "select", options: ["Equipment", "Fuel", "Labor / commission", "Security", "Compliance", "Other"] },
+        { key: "direction", label: "Direction", type: "select", options: ["Spent", "Received"] },
+        { key: "amount", label: "Amount", type: "number" },
+        { key: "currency", label: "Currency", type: "select", options: ["USD", "ETB"] },
+        { key: "notes", label: "Notes", type: "text", full: true }
+      ],
+      columns: ["date", "category", "direction", "amount", "currency"]
+    },
+    {
+      key: "compensation", label: "My pay", title: "My compensation ledger",
+      desc: "Base/retainer, commission accrued vs. actually payable, and expenses owed to you.",
+      fields: [
+        { key: "date", label: "Date", type: "date", required: true },
+        { key: "type", label: "Type", type: "select", options: ["Base / retainer", "Commission", "Expense reimbursement"] },
+        { key: "amount", label: "Amount", type: "number" },
+        { key: "currency", label: "Currency", type: "select", options: ["USD", "ETB"] },
+        { key: "status", label: "Status", type: "select", options: ["Paid", "Accrued — not yet payable", "Agreed but pending", "Disputed"] },
+        { key: "notes", label: "Notes", type: "text", full: true }
+      ],
+      columns: ["date", "type", "amount", "currency", "status"]
+    }
+  ];
+
+  // ---------- State ----------
+  // `data[module]` holds entries as returned by the API: {id, module, data:{...fields}, created_by, created_at}
+  // The rest of the rendering code reads/writes fields directly on each row (r.name, r.status, etc.)
+  // via thin wrapper objects, so the existing render functions don't need to change shape.
+  let data = {};
+  MODULES.forEach(m => { if (m.fields) data[m.key] = []; });
+
+  function wrap(apiEntry) {
+    // flatten {id, data:{...}} into {_id, ...fields} for the existing render code
+    return Object.assign({ _id: apiEntry.id, _createdBy: apiEntry.created_by }, apiEntry.data);
+  }
+
+  async function loadAllData() {
+    for (const m of MODULES) {
+      if (!m.fields) continue;
+      const rows = await api("/entries?module=" + encodeURIComponent(m.key));
+      data[m.key] = rows.map(wrap);
+    }
+  }
+
+  let activeTab = "dashboard";
+
+  // ---------- Rendering ----------
+  const content = document.getElementById("content");
+  const sidebarTabs = document.getElementById("sidebarTabs");
+  const bottomNav = document.getElementById("bottomNav");
+
+  function buildNav() {
+    sidebarTabs.innerHTML = "";
+    bottomNav.innerHTML = "";
+    MODULES.forEach(m => {
+      const b1 = document.createElement("button");
+      b1.className = "tab-btn" + (m.key === activeTab ? " active" : "");
+      b1.textContent = m.label;
+      b1.onclick = () => { activeTab = m.key; render(); };
+      sidebarTabs.appendChild(b1);
+
+      const b2 = document.createElement("button");
+      b2.className = m.key === activeTab ? "active" : "";
+      b2.textContent = m.label;
+      b2.onclick = () => { activeTab = m.key; render(); };
+      bottomNav.appendChild(b2);
+    });
+  }
+
+  function esc(v) {
+    if (v === undefined || v === null) return "";
+    return String(v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + "T00:00:00");
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return Math.round((d - now) / 86400000);
+  }
+
+  function statusPillClass(text) {
+    const t = (text || "").toLowerCase();
+    if (t.includes("expired") || t.includes("disputed") || t.includes("bad")) return "pill-bad";
+    if (t.includes("expiring") || t.includes("pending") || t.includes("accrued") || t.includes("maintenance")) return "pill-warn";
+    if (t.includes("valid") || t.includes("verified") || t.includes("paid") || t.includes("active")) return "pill-ok";
+    return "";
+  }
+
+  function renderDashboard() {
+    const equipActive = (data.equipment || []).filter(r => r.status === "Active").length;
+    const equipTotal = (data.equipment || []).length;
+    const custodyTotalG = (data.custody || []).reduce((s, r) => s + (parseFloat(r.weightGrams) || 0), 0);
+    const spentUSD = (data.budget || []).filter(r => r.direction === "Spent" && r.currency === "USD")
+      .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    const compAccruedUSD = (data.compensation || []).filter(r => r.status && r.status.startsWith("Accrued") && r.currency === "USD")
+      .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+
+    const expiringSoon = (data.compliance || []).filter(r => {
+      const d = daysUntil(r.expiryDate);
+      return d !== null && d <= 30;
+    });
+
+    let html = `<h1>Overview</h1><p class="section-desc">A snapshot across every log. Data is stored on this device only — use Export below to move it to another device.</p>`;
+
+    html += `<div class="cards">
+      <div class="card"><div class="label">Equipment active</div><div class="value">${equipActive} / ${equipTotal}</div></div>
+      <div class="card"><div class="label">Gold in custody log (g)</div><div class="value">${custodyTotalG.toLocaleString()}</div></div>
+      <div class="card"><div class="label">Spent (USD, logged)</div><div class="value">$${spentUSD.toLocaleString()}</div></div>
+      <div class="card ${compAccruedUSD > 0 ? "flag" : ""}"><div class="label">Your commission accrued, not yet payable (USD)</div><div class="value">$${compAccruedUSD.toLocaleString()}</div></div>
+    </div>`;
+
+    if (expiringSoon.length) {
+      html += `<div class="alert-list">`;
+      expiringSoon.forEach(r => {
+        const d = daysUntil(r.expiryDate);
+        const cls = d < 0 ? "danger" : "";
+        html += `<div class="alert ${cls}">${d < 0 ? "Expired" : "Expires in " + d + " day(s)"} — ${esc(r.name)} (${esc(r.expiryDate)})</div>`;
+      });
+      html += `</div>`;
+    }
+
+    html += `<div class="toolbar"><div></div><div class="right">
+        <button class="ghost" id="exportBtn">Export all data (JSON)</button>
+        <button class="ghost" id="importBtn">Import data</button>
+      </div></div>`;
+
+    html += `<p class="section-desc">Export regularly and keep a copy somewhere safe (email to yourself, a shared drive) — this is your only backup until a shared server version is set up.</p>`;
+
+    content.innerHTML = html;
+    document.getElementById("exportBtn").onclick = exportAll;
+    document.getElementById("importBtn").onclick = () => document.getElementById("importFile").click();
+  }
+
+  function renderModule(mod) {
+    let html = `<h1>${esc(mod.title)}</h1><p class="section-desc">${esc(mod.desc)}</p>`;
+
+    html += `<form class="entry-form" id="entryForm">`;
+    mod.fields.forEach(f => {
+      html += `<div class="${f.full ? "full" : ""}"><label for="f_${f.key}">${esc(f.label)}${f.required ? " *" : ""}</label>`;
+      if (f.type === "select") {
+        html += `<select id="f_${f.key}" name="${f.key}"><option value=""></option>`;
+        f.options.forEach(o => { html += `<option value="${esc(o)}">${esc(o)}</option>`; });
+        html += `</select>`;
+      } else {
+        html += `<input id="f_${f.key}" name="${f.key}" type="${f.type}" ${f.required ? "required" : ""}>`;
+      }
+      html += `</div>`;
+    });
+    html += `<div class="form-actions"><button class="primary" type="submit">Add entry</button></div>`;
+    html += `</form>`;
+
+    const rows = data[mod.key] || [];
+    html += `<div class="table-wrap"><table><thead><tr>`;
+    mod.columns.forEach(c => {
+      const f = mod.fields.find(x => x.key === c);
+      html += `<th>${esc(f ? f.label : c)}</th>`;
+    });
+    html += `<th></th></tr></thead><tbody>`;
+
+    if (!rows.length) {
+      html += `<tr class="empty-row"><td colspan="${mod.columns.length + 1}">No entries yet — add the first one above.</td></tr>`;
+    } else {
+      rows.slice().reverse().forEach(r => {
+        html += `<tr>`;
+        mod.columns.forEach(c => {
+          const f = mod.fields.find(x => x.key === c);
+          const val = r[c];
+          if (f && f.type === "select" && (c === "status" || c === "verified" || c === "type")) {
+            html += `<td><span class="status-pill ${statusPillClass(val)}">${esc(val || "—")}</span></td>`;
+          } else if (f && f.type === "number") {
+            html += `<td class="num">${val !== undefined && val !== "" ? Number(val).toLocaleString() : "—"}</td>`;
+          } else {
+            html += `<td>${esc(val) || "—"}</td>`;
+          }
+        });
+        html += `<td><button class="row-del" data-id="${r._id}" data-mod="${mod.key}">Delete</button></td></tr>`;
+      });
+    }
+    html += `</tbody></table></div>`;
+
+    content.innerHTML = html;
+
+    document.getElementById("entryForm").onsubmit = async function (e) {
+      e.preventDefault();
+      const submitBtn = e.target.querySelector("button[type=submit]");
+      const fieldData = {};
+      mod.fields.forEach(f => {
+        fieldData[f.key] = document.getElementById("f_" + f.key).value;
+      });
+      submitBtn.disabled = true;
+      try {
+        const created = await api("/entries", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ module: mod.key, data: fieldData })
+        });
+        data[mod.key].push(wrap(created));
+        render();
+      } catch (err) {
+        alert("Could not save: " + err.message);
+        submitBtn.disabled = false;
+      }
+    };
+
+    content.querySelectorAll(".row-del").forEach(btn => {
+      btn.onclick = async function () {
+        if (!confirm("Delete this entry? This cannot be undone.")) return;
+        const id = btn.getAttribute("data-id");
+        const modKey = btn.getAttribute("data-mod");
+        try {
+          await api("/entries/" + id, { method: "DELETE" });
+          data[modKey] = data[modKey].filter(r => String(r._id) !== String(id));
+          render();
+        } catch (err) {
+          alert("Could not delete: " + err.message);
+        }
+      };
+    });
+  }
+
+  function render() {
+    buildNav();
+    if (activeTab === "dashboard") {
+      renderDashboard();
+    } else {
+      const mod = MODULES.find(m => m.key === activeTab);
+      if (mod) renderModule(mod);
+    }
+  }
+
+  function exportAll() {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "assosa-ledger-export-" + new Date().toISOString().slice(0, 10) + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  document.getElementById("importFile").addEventListener("change", function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function () {
+      try {
+        const incoming = JSON.parse(reader.result);
+        if (!confirm("This will re-add every entry in that backup file to the shared server (it does not remove anything currently there). Continue?")) return;
+        let count = 0;
+        for (const m of MODULES) {
+          if (!m.fields) continue;
+          const rows = incoming[m.key] || [];
+          for (const row of rows) {
+            const fieldData = {};
+            m.fields.forEach(f => { fieldData[f.key] = row[f.key]; });
+            const created = await api("/entries", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ module: m.key, data: fieldData })
+            });
+            data[m.key].push(wrap(created));
+            count++;
+          }
+        }
+        render();
+        alert("Restored " + count + " entr" + (count === 1 ? "y" : "ies") + " to the server.");
+      } catch (err) {
+        alert("Could not restore that backup: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  // ---------- Theme ----------
+  function applyTheme(t) {
+    if (t) document.documentElement.setAttribute("data-theme", t);
+    else document.documentElement.removeAttribute("data-theme");
+    const label = (t === "light") ? "Switch to dark view" : "Switch to light view";
+    document.getElementById("themeToggle").textContent = label;
+  }
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute("data-theme");
+    const next = current === "light" ? "dark" : "light";
+    localStorage.setItem(THEME_KEY, next);
+    applyTheme(next);
+  }
+  applyTheme(localStorage.getItem(THEME_KEY));
+  document.getElementById("themeToggle").onclick = toggleTheme;
+  document.getElementById("themeToggleMobile").onclick = toggleTheme;
+  document.getElementById("logoutBtn").onclick = signOut;
+
+  // ---------- Boot ----------
+  function showApp() {
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("appShell").style.display = "flex";
+    document.getElementById("whoAmI").textContent = session ? (session.name + " · " + session.role) : "";
+  }
+
+  document.getElementById("loginForm").onsubmit = async function (e) {
+    e.preventDefault();
+    const errBox = document.getElementById("loginError");
+    errBox.style.display = "none";
+    const url = document.getElementById("serverUrl").value.trim();
+    const username = document.getElementById("loginUser").value.trim();
+    const password = document.getElementById("loginPass").value;
+    if (!url || !username || !password) return;
+    apiUrl = url;
+    try {
+      const body = new URLSearchParams();
+      body.set("username", username);
+      body.set("password", password);
+      const resp = await fetch(apiUrl.replace(/\/$/, "") + "/auth/login", { method: "POST", body: body });
+      if (!resp.ok) {
+        const j = await resp.json().catch(() => ({}));
+        throw new Error(j.detail || "Sign-in failed");
+      }
+      const j = await resp.json();
+      token = j.access_token;
+      session = { username: j.username, name: j.name, role: j.role };
+      localStorage.setItem(API_URL_KEY, apiUrl);
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      await boot();
+    } catch (err) {
+      errBox.textContent = err.message || "Could not reach that server.";
+      errBox.style.display = "block";
+    }
+  };
+
+  async function boot() {
+    showApp();
+    try {
+      await loadAllData();
+      render();
+    } catch (err) {
+      alert("Could not load data from the server: " + err.message);
+    }
+  }
+
+  if (apiUrl && token && session) {
+    document.getElementById("serverUrl").value = apiUrl;
+    boot();
+  } else {
+    document.getElementById("serverUrl").value = apiUrl;
+    document.getElementById("loginScreen").style.display = "flex";
+  }
+})();
+</script>
+</body>
+</html>

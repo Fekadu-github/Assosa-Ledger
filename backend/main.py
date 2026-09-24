@@ -209,6 +209,24 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db), user: User =
     return {"status": "created", "username": new_user.username}
 
 
+@app.get("/auth/users")
+def list_users(db: Session = Depends(get_db), user: User = Depends(require_role("owner"))):
+    users = db.query(User).order_by(User.username).all()
+    return [{"username": u.username, "name": u.name, "role": u.role} for u in users]
+
+
+@app.delete("/auth/users/{username}")
+def delete_user(username: str, db: Session = Depends(get_db), user: User = Depends(require_role("owner"))):
+    if username == user.username:
+        raise HTTPException(status_code=400, detail="You can't delete your own account while signed in as it")
+    target = db.query(User).filter(User.username == username).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="No such user")
+    db.delete(target)
+    db.commit()
+    return {"status": "deleted", "username": username}
+
+
 @app.get("/entries", response_model=list[EntryOut])
 def list_entries(module: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     q = db.query(Entry)

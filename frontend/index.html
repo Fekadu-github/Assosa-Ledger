@@ -167,6 +167,7 @@
   tr:last-child td { border-bottom: none; }
   td.num { font-variant-numeric: tabular-nums; }
   .status-pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; }
+  .form-error { background: var(--danger-bg); color: var(--danger); border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 12px; }
   .pill-ok { background: var(--success-bg); color: var(--success); }
   .pill-warn { background: var(--warning-bg); color: var(--warning); }
   .pill-bad { background: var(--danger-bg); color: var(--danger); }
@@ -266,7 +267,10 @@
         </svg>
         <div class="name">Assosa Ledger</div>
       </div>
-      <button class="theme-toggle" id="themeToggleMobile" style="width:auto;">Theme</button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="theme-toggle" id="themeToggleMobile" style="width:auto;">Theme</button>
+        <button class="theme-toggle" id="logoutBtnMobile" style="width:auto;">Sign out</button>
+      </div>
     </div>
     <div id="content"></div>
   </main>
@@ -320,6 +324,7 @@
   // ---------- Module schema ----------
   const MODULES = [
     { key: "dashboard", label: "Overview" },
+    { key: "admin", label: "Admin", ownerOnly: true },
     {
       key: "equipment", label: "Equipment", title: "Equipment & fleet",
       desc: "Excavators, trucks, and site vehicles — status and last service.",
@@ -453,7 +458,9 @@
   function buildNav() {
     sidebarTabs.innerHTML = "";
     bottomNav.innerHTML = "";
+    const isOwner = session && session.role === "owner";
     MODULES.forEach(m => {
+      if (m.ownerOnly && !isOwner) return;
       const b1 = document.createElement("button");
       b1.className = "tab-btn" + (m.key === activeTab ? " active" : "");
       b1.textContent = m.label;
@@ -621,10 +628,96 @@
     });
   }
 
+  const ROLE_OPTIONS = ["owner", "gm", "geologist", "viewer"];
+
+  async function renderAdmin() {
+    content.innerHTML = `<h1>Admin</h1><p class="section-desc">Create and remove sign-in accounts. Only owner accounts can see this tab.</p>
+      <div id="adminError" class="form-error" style="display:none;"></div>
+      <form class="entry-form" id="createUserForm">
+        <div><label for="au_username">Username *</label><input id="au_username" required></div>
+        <div><label for="au_name">Full name *</label><input id="au_name" required></div>
+        <div><label for="au_role">Role *</label>
+          <select id="au_role" required>${ROLE_OPTIONS.map(r => `<option value="${r}">${r}</option>`).join("")}</select>
+        </div>
+        <div><label for="au_password">Password *</label><input id="au_password" type="password" required></div>
+        <div class="form-actions"><button class="primary" type="submit">Create user</button></div>
+      </form>
+      <div class="table-wrap"><table><thead><tr><th>Username</th><th>Name</th><th>Role</th><th></th></tr></thead>
+      <tbody id="userRows"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>`;
+
+    const errBox = document.getElementById("adminError");
+    const rowsBody = document.getElementById("userRows");
+
+    async function refreshUsers() {
+      try {
+        const users = await api("/auth/users");
+        if (!users.length) {
+          rowsBody.innerHTML = `<tr class="empty-row"><td colspan="4">No users found.</td></tr>`;
+          return;
+        }
+        rowsBody.innerHTML = users.map(u => `
+          <tr>
+            <td>${esc(u.username)}</td>
+            <td>${esc(u.name)}</td>
+            <td>${esc(u.role)}</td>
+            <td>${u.username === session.username
+              ? `<span class="status-pill">You</span>`
+              : `<button class="row-del" data-username="${esc(u.username)}">Delete</button>`}</td>
+          </tr>`).join("");
+        rowsBody.querySelectorAll(".row-del").forEach(btn => {
+          btn.onclick = async function () {
+            const uname = btn.getAttribute("data-username");
+            if (!confirm(`Delete the account "${uname}"? This cannot be undone.`)) return;
+            try {
+              await api("/auth/users/" + encodeURIComponent(uname), { method: "DELETE" });
+              refreshUsers();
+            } catch (err) {
+              errBox.textContent = err.message || "Could not delete that user.";
+              errBox.style.display = "block";
+            }
+          };
+        });
+      } catch (err) {
+        rowsBody.innerHTML = `<tr><td colspan="4">Could not load users: ${esc(err.message)}</td></tr>`;
+      }
+    }
+
+    document.getElementById("createUserForm").onsubmit = async function (e) {
+      e.preventDefault();
+      errBox.style.display = "none";
+      const submitBtn = e.target.querySelector("button[type=submit]");
+      const payload = {
+        username: document.getElementById("au_username").value.trim(),
+        name: document.getElementById("au_name").value.trim(),
+        role: document.getElementById("au_role").value,
+        password: document.getElementById("au_password").value
+      };
+      submitBtn.disabled = true;
+      try {
+        await api("/auth/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        e.target.reset();
+        refreshUsers();
+      } catch (err) {
+        errBox.textContent = err.message || "Could not create that user.";
+        errBox.style.display = "block";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    };
+
+    refreshUsers();
+  }
+
   function render() {
     buildNav();
     if (activeTab === "dashboard") {
       renderDashboard();
+    } else if (activeTab === "admin") {
+      renderAdmin();
     } else {
       const mod = MODULES.find(m => m.key === activeTab);
       if (mod) renderModule(mod);
@@ -694,12 +787,24 @@
   document.getElementById("themeToggle").onclick = toggleTheme;
   document.getElementById("themeToggleMobile").onclick = toggleTheme;
   document.getElementById("logoutBtn").onclick = signOut;
+  document.getElementById("logoutBtnMobile").onclick = signOut;
+
+  function formatDisplayName(session) {
+    if (!session || !session.name) return "";
+    const titled = session.name
+      .split(" ")
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+    const isOwner = (session.role || "").toLowerCase().includes("owner");
+    return isOwner ? "Dr " + titled : titled;
+  }
 
   // ---------- Boot ----------
   function showApp() {
     document.getElementById("loginScreen").style.display = "none";
     document.getElementById("appShell").style.display = "flex";
-    document.getElementById("whoAmI").textContent = session ? (session.name + " · " + session.role) : "";
+    document.getElementById("whoAmI").textContent = session ? (formatDisplayName(session) + " · " + session.role) : "";
   }
 
   document.getElementById("loginForm").onsubmit = async function (e) {

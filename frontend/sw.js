@@ -1,4 +1,4 @@
-const CACHE_NAME = "assosa-ledger-v1";
+const CACHE_NAME = "assosa-ledger-v2";
 const SHELL_FILES = [
   "/",
   "/index.html",
@@ -34,9 +34,13 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // let API calls pass through untouched
 
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
+  // The app itself (the page and its logic) must always come from the
+  // network first, so a new deploy is never masked by a stale cached copy.
+  // Cache is only used as a fallback if the device is actually offline.
+  const isAppShell = req.mode === "navigate" || url.pathname === "/" || url.pathname.endsWith("/index.html");
+  if (isAppShell) {
+    event.respondWith(
+      fetch(req)
         .then((resp) => {
           if (resp.ok) {
             const copy = resp.clone();
@@ -44,8 +48,22 @@ self.addEventListener("fetch", (event) => {
           }
           return resp;
         })
-        .catch(() => cached);
-      return cached || network;
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Static assets (icons, manifest) rarely change, so cache-first is fine here.
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+      return fetch(req).then((resp) => {
+        if (resp.ok) {
+          const copy = resp.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+        }
+        return resp;
+      });
     })
   );
 });

@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Assosa Ledger — Site Operations</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#D9A404">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Assosa Ledger">
 <style>
   :root {
     --bg: #1F160A;
@@ -742,6 +749,12 @@
   } else {
     document.getElementById("serverUrl").value = apiUrl;
     document.getElementById("loginScreen").style.display = "flex";
+  }
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
   }
 })();
 </script>

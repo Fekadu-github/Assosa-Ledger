@@ -55,7 +55,7 @@ VALID_MODULES = {
     "equipment", "crews", "extraction", "custody",
     "compliance", "security", "budget", "compensation",
 }
-VALID_ROLES = {"owner", "gm", "geologist", "viewer"}
+VALID_ROLES = {"owner", "gm", "supervisor", "geologist", "viewer"}
 
 
 # ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 def require_role(*roles):
     def _check(user: User = Depends(get_current_user)) -> User:
-        if user.role not in roles and user.role != "owner":
+        if user.role not in roles:
             raise HTTPException(status_code=403, detail="Not permitted for your role")
         return user
     return _check
@@ -191,9 +191,9 @@ def me(user: User = Depends(get_current_user)):
 
 
 @app.post("/auth/users")
-def create_user(payload: UserCreate, db: Session = Depends(get_db), user: User = Depends(require_role("owner"))):
-    """Only an existing 'owner' can create new logins -- e.g. you creating
-    an account for a geologist or your friend."""
+def create_user(payload: UserCreate, db: Session = Depends(get_db), user: User = Depends(require_role("gm"))):
+    """Only an existing 'gm' account can create new logins -- e.g. Fekadu
+    creating an account for a supervisor or geologist."""
     if payload.role not in VALID_ROLES:
         raise HTTPException(status_code=400, detail=f"role must be one of {sorted(VALID_ROLES)}")
     if db.query(User).filter(User.username == payload.username).first():
@@ -210,13 +210,13 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db), user: User =
 
 
 @app.get("/auth/users")
-def list_users(db: Session = Depends(get_db), user: User = Depends(require_role("owner"))):
+def list_users(db: Session = Depends(get_db), user: User = Depends(require_role("gm"))):
     users = db.query(User).order_by(User.username).all()
     return [{"username": u.username, "name": u.name, "role": u.role} for u in users]
 
 
 @app.delete("/auth/users/{username}")
-def delete_user(username: str, db: Session = Depends(get_db), user: User = Depends(require_role("owner"))):
+def delete_user(username: str, db: Session = Depends(get_db), user: User = Depends(require_role("gm"))):
     if username == user.username:
         raise HTTPException(status_code=400, detail="You can't delete your own account while signed in as it")
     target = db.query(User).filter(User.username == username).first()

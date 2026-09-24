@@ -324,7 +324,7 @@
   // ---------- Module schema ----------
   const MODULES = [
     { key: "dashboard", label: "Overview" },
-    { key: "admin", label: "Admin", ownerOnly: true },
+    { key: "admin", label: "Admin", roles: ["gm"] },
     {
       key: "equipment", label: "Equipment", title: "Equipment & fleet",
       desc: "Excavators, trucks, and site vehicles — status and last service.",
@@ -458,9 +458,9 @@
   function buildNav() {
     sidebarTabs.innerHTML = "";
     bottomNav.innerHTML = "";
-    const isOwner = session && session.role === "owner";
+    const myRole = session && session.role;
     MODULES.forEach(m => {
-      if (m.ownerOnly && !isOwner) return;
+      if (m.roles && !m.roles.includes(myRole)) return;
       const b1 = document.createElement("button");
       b1.className = "tab-btn" + (m.key === activeTab ? " active" : "");
       b1.textContent = m.label;
@@ -628,10 +628,10 @@
     });
   }
 
-  const ROLE_OPTIONS = ["owner", "gm", "geologist", "viewer"];
+  const ROLE_OPTIONS = ["owner", "gm", "supervisor", "geologist", "viewer"];
 
   async function renderAdmin() {
-    content.innerHTML = `<h1>Admin</h1><p class="section-desc">Create and remove sign-in accounts. Only owner accounts can see this tab.</p>
+    content.innerHTML = `<h1>Admin</h1><p class="section-desc">Create and remove sign-in accounts. Only GM accounts can see this tab.</p>
       <div id="adminError" class="form-error" style="display:none;"></div>
       <form class="entry-form" id="createUserForm">
         <div><label for="au_username">Username *</label><input id="au_username" required></div>

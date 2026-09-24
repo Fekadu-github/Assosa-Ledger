@@ -119,6 +119,12 @@ class UserCreate(BaseModel):
     password: str
 
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    password: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -213,6 +219,23 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db), user: User =
 def list_users(db: Session = Depends(get_db), user: User = Depends(require_role("gm"))):
     users = db.query(User).order_by(User.username).all()
     return [{"username": u.username, "name": u.name, "role": u.role} for u in users]
+
+
+@app.patch("/auth/users/{username}")
+def update_user(username: str, payload: UserUpdate, db: Session = Depends(get_db), user: User = Depends(require_role("gm"))):
+    target = db.query(User).filter(User.username == username).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="No such user")
+    if payload.role is not None:
+        if payload.role not in VALID_ROLES:
+            raise HTTPException(status_code=400, detail=f"role must be one of {sorted(VALID_ROLES)}")
+        target.role = payload.role
+    if payload.name is not None and payload.name.strip():
+        target.name = payload.name.strip()
+    if payload.password:
+        target.password_hash = pwd_context.hash(payload.password)
+    db.commit()
+    return {"username": target.username, "name": target.name, "role": target.role}
 
 
 @app.delete("/auth/users/{username}")

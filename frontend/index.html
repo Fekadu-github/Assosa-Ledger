@@ -671,6 +671,23 @@
 
     const errBox = document.getElementById("adminError");
     const rowsBody = document.getElementById("userRows");
+    let editingUser = null;
+
+    function editRowHtml(u) {
+      return `
+        <tr>
+          <td>${esc(u.username)}</td>
+          <td><input id="eu_name" value="${esc(u.name)}" style="width:100%;"></td>
+          <td><select id="eu_role" style="width:100%;">${ROLE_OPTIONS.map(r => `<option value="${r}" ${r === u.role ? "selected" : ""}>${r}</option>`).join("")}</select></td>
+          <td colspan="1">
+            <input id="eu_password" type="password" placeholder="New password (optional)" style="width:100%; margin-bottom:6px;">
+            <div style="display:flex; gap:6px;">
+              <button class="primary" id="eu_save" type="button">Save</button>
+              <button class="row-del" id="eu_cancel" type="button">Cancel</button>
+            </div>
+          </td>
+        </tr>`;
+    }
 
     async function refreshUsers() {
       try {
@@ -679,16 +696,58 @@
           rowsBody.innerHTML = `<tr class="empty-row"><td colspan="4">No users found.</td></tr>`;
           return;
         }
-        rowsBody.innerHTML = users.map(u => `
+        rowsBody.innerHTML = users.map(u => {
+          if (u.username === editingUser) return editRowHtml(u);
+          return `
           <tr>
             <td>${esc(u.username)}</td>
             <td>${esc(u.name)}</td>
             <td>${esc(u.role)}</td>
-            <td>${u.username === session.username
-              ? `<span class="status-pill">You</span>`
-              : `<button class="row-del" data-username="${esc(u.username)}">Delete</button>`}</td>
-          </tr>`).join("");
-        rowsBody.querySelectorAll(".row-del").forEach(btn => {
+            <td>
+              <button class="row-del" data-edit="${esc(u.username)}" style="background:transparent; color:var(--accent);">Edit</button>
+              ${u.username === session.username
+                ? ""
+                : `<button class="row-del" data-username="${esc(u.username)}">Delete</button>`}
+            </td>
+          </tr>`;
+        }).join("");
+
+        rowsBody.querySelectorAll("[data-edit]").forEach(btn => {
+          btn.onclick = function () {
+            editingUser = btn.getAttribute("data-edit");
+            refreshUsers();
+          };
+        });
+
+        const cancelBtn = document.getElementById("eu_cancel");
+        if (cancelBtn) cancelBtn.onclick = function () { editingUser = null; refreshUsers(); };
+
+        const saveBtn = document.getElementById("eu_save");
+        if (saveBtn) saveBtn.onclick = async function () {
+          errBox.style.display = "none";
+          const payload = {
+            name: document.getElementById("eu_name").value.trim(),
+            role: document.getElementById("eu_role").value
+          };
+          const pw = document.getElementById("eu_password").value;
+          if (pw) payload.password = pw;
+          saveBtn.disabled = true;
+          try {
+            await api("/auth/users/" + encodeURIComponent(editingUser), {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+            editingUser = null;
+            refreshUsers();
+          } catch (err) {
+            errBox.textContent = err.message || "Could not save changes.";
+            errBox.style.display = "block";
+            saveBtn.disabled = false;
+          }
+        };
+
+        rowsBody.querySelectorAll("[data-username]").forEach(btn => {
           btn.onclick = async function () {
             const uname = btn.getAttribute("data-username");
             if (!confirm(`Delete the account "${uname}"? This cannot be undone.`)) return;

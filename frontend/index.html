@@ -415,16 +415,18 @@
     },
     {
       key: "compensation", label: "My pay", title: "My compensation ledger",
-      desc: "Base/retainer, commission accrued vs. actually payable, and expenses owed to you.",
+      desc: "Base/retainer, commission accrued vs. actually payable, and expenses owed to you. Commission paid by one role to another (e.g. Owner → GM) shows on both sides automatically.",
       fields: [
         { key: "date", label: "Date", type: "date", required: true },
         { key: "type", label: "Type", type: "select", options: ["Base / retainer", "Commission", "Expense reimbursement"] },
+        { key: "paidBy", label: "Paid by", type: "select", options: ["Owner", "GM", "Supervisor", "Geologist"] },
+        { key: "paidTo", label: "Paid to", type: "select", options: ["Owner", "GM", "Supervisor", "Geologist"] },
         { key: "amount", label: "Amount", type: "number" },
         { key: "currency", label: "Currency", type: "select", options: ["USD", "ETB"] },
         { key: "status", label: "Status", type: "select", options: ["Paid", "Accrued — not yet payable", "Agreed but pending", "Disputed"] },
         { key: "notes", label: "Notes", type: "text", full: true }
       ],
-      columns: ["date", "type", "amount", "currency", "status"]
+      columns: ["date", "type", "paidBy", "paidTo", "amount", "currency", "status"]
     }
   ];
 
@@ -496,6 +498,21 @@
     return "";
   }
 
+  // For a "My pay" row, work out whether the signed-in user is the payer or
+  // the recipient of that entry, so e.g. a commission the owner pays the GM
+  // shows as "You pay" for the owner and "You receive" for the GM.
+  function compensationDirection(r, session) {
+    if (!session) return null;
+    const myRole = (session.role || "").toLowerCase();
+    const paidBy = (r.paidBy || "").toLowerCase();
+    const paidTo = (r.paidTo || "").toLowerCase();
+    if (!paidBy && !paidTo) return null;
+    if (paidTo === myRole) return { text: "You receive" + (r.paidBy ? " from " + r.paidBy : ""), cls: "pill-ok" };
+    if (paidBy === myRole) return { text: "You pay" + (r.paidTo ? " to " + r.paidTo : ""), cls: "pill-bad" };
+    if (paidBy && paidTo) return { text: r.paidBy + " → " + r.paidTo, cls: "" };
+    return null;
+  }
+
   function renderDashboard() {
     const equipActive = (data.equipment || []).filter(r => r.status === "Active").length;
     const equipTotal = (data.equipment || []).length;
@@ -565,10 +582,12 @@
       const f = mod.fields.find(x => x.key === c);
       html += `<th>${esc(f ? f.label : c)}</th>`;
     });
-    html += `<th></th></tr></thead><tbody>`;
+    html += `<th></th>`;
+    if (mod.key === "compensation") html += `<th>For you</th>`;
+    html += `</tr></thead><tbody>`;
 
     if (!rows.length) {
-      html += `<tr class="empty-row"><td colspan="${mod.columns.length + 1}">No entries yet — add the first one above.</td></tr>`;
+      html += `<tr class="empty-row"><td colspan="${mod.columns.length + (mod.key === "compensation" ? 2 : 1)}">No entries yet — add the first one above.</td></tr>`;
     } else {
       rows.slice().reverse().forEach(r => {
         html += `<tr>`;
@@ -583,7 +602,12 @@
             html += `<td>${esc(val) || "—"}</td>`;
           }
         });
-        html += `<td><button class="row-del" data-id="${r._id}" data-mod="${mod.key}">Delete</button></td></tr>`;
+        html += `<td><button class="row-del" data-id="${r._id}" data-mod="${mod.key}">Delete</button></td>`;
+        if (mod.key === "compensation") {
+          const dir = compensationDirection(r, session);
+          html += `<td>${dir ? `<span class="status-pill ${dir.cls}">${esc(dir.text)}</span>` : "—"}</td>`;
+        }
+        html += `</tr>`;
       });
     }
     html += `</tbody></table></div>`;

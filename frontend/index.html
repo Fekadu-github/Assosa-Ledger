@@ -289,7 +289,8 @@
   const TOKEN_KEY = "assosa_token";
   const SESSION_KEY = "assosa_session"; // {username, name, role}
 
-  let apiUrl = localStorage.getItem(API_URL_KEY) || "";
+  const DEFAULT_API_URL = "https://assosa-ledger.onrender.com"; // must match your Render service URL
+  let apiUrl = localStorage.getItem(API_URL_KEY) || DEFAULT_API_URL;
   let token = localStorage.getItem(TOKEN_KEY) || "";
   let session = null;
   try { session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch (e) { session = null; }
@@ -894,11 +895,18 @@
     e.preventDefault();
     const errBox = document.getElementById("loginError");
     errBox.style.display = "none";
-    const url = document.getElementById("serverUrl").value.trim();
+    const url = (document.getElementById("serverUrl").value || apiUrl || DEFAULT_API_URL).trim();
     const username = document.getElementById("loginUser").value.trim();
     const password = document.getElementById("loginPass").value;
-    if (!url || !username || !password) return;
+    if (!username || !password) {
+      errBox.textContent = "Please enter your username and password.";
+      errBox.style.display = "block";
+      return;
+    }
     apiUrl = url;
+    const submitBtn = e.submitter || document.querySelector("#loginForm button[type=submit]");
+    const submitLabel = submitBtn ? submitBtn.textContent : "";
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Signing in…"; }
     try {
       const body = new URLSearchParams();
       body.set("username", username);
@@ -918,6 +926,8 @@
     } catch (err) {
       errBox.textContent = err.message || "Could not reach that server.";
       errBox.style.display = "block";
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = submitLabel; }
     }
   };
 
@@ -935,7 +945,7 @@
     document.getElementById("serverUrl").value = apiUrl;
     boot();
   } else {
-    document.getElementById("serverUrl").value = apiUrl;
+    document.getElementById("serverUrl").value = apiUrl || DEFAULT_API_URL;
     document.getElementById("loginScreen").style.display = "flex";
   }
 
